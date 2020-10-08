@@ -670,6 +670,76 @@ ctrl+k v: 这个意思是先同时按住ctrl和k键，放开后再按一个v键
                 * 设置is-nest属性为true
                 * 根据child.path生成base-path属性传入sidebar-item组件
 * ## 重定向
+  ### 登录重定向
+      login.vue中对$route进行监听：
+      ```js
+          watch: {
+            $route: {
+            handler: function(route) {
+                const query = route.query
+                if (query) {
+                this.redirect = query.redirect
+                this.otherQuery = this.getOtherQuery(query)
+                }
+            },
+            immediate: true
+            }
+        },
+      ```
+      vue-element-admin这个框架的登录重定向是通过watch来进行实现的，他会去监听我们路由的变化，这里的immediate设置为true，他会在created的时候就进行调用。他会获取我们router下面的query，也就是所有的查询条件。使用getOtherQuery方法从query里面提取出其他非redirect属性。
+      this.getOtherQuery(query)的用途是获取除redirect外的其他查询条件，登陆成功后：
+      ```js
+            handleLogin() {
+                this.$refs.loginForm.validate(valid => {
+                    if (valid) {
+                    this.loading = true
+                    this.$store.dispatch('user/login', this.loginForm)
+                        .then(() => {
+                        this.$router.push({ path: this.redirect || '/', query: this.otherQuery })
+                        this.loading = false
+                        })
+                        .catch(() => {
+                        this.loading = false
+                        })
+                    } else {
+                    console.log('error submit!!')
+                    return false
+                    }
+                })
+            },
+      ```
+      完成重定向的代码为：
+      ```js
+        this.$router.push({ path: this.redirect || '/', query: this.otherQuery })
+      ```
+
+    ### 重定向组件
+
+    vue-element-admin 提供了专门的重定向组件，源码如下：
+
+    ```js
+        <script>
+            export default {
+            created() {
+                const { params, query } = this.$route
+                const { path } = params
+                this.$router.replace({ path: '/' + path, query })
+            },
+            render: function(h) {
+                return h() // avoid warning message
+            }
+            }
+        </script>
+    ```
+    他只有一个script，通过render函数进行渲染，但是他没有实际的渲染内容，因为他调用一个逻辑，在created的时候就跳走了。进入redirect组件后，他会将我们的query拿出来，同时将我们的path从我们的params中提取出来。然后将path前面添加上一个‘/’直接进行调用，这里有一个细节(在router.js里)如下，就是动态路由的配置方法
+    ```js
+        path: '/redirect/:path(.*)',
+    ```
+    这里/:path后面有个*,这个*并不是随意往上写的，表示匹配零个或者多个路由，比方说路由为 /redirect 时，任然能匹配到redirect组件。如果将路由改为：
+    ```js
+      path: '/redirect/:path
+    ```
+    这里将其*去掉，那么将匹配不到任何路由，比如这里路由为 ‘/redirect/book/create’，这里就有个问题，因为这样写，那么他匹配到的路由将会是'/redirect/book'。所以这里vue-element-admin这个框架使用了路由通配符来实现匹配更多的一个路由。所以我们的redirect后面不管有多少的路由，都能匹配到，前提是必须有一个/进行分割。
 
 * ## 面包屑导航
 
