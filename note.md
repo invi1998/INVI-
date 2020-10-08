@@ -743,6 +743,80 @@ ctrl+k v: 这个意思是先同时按住ctrl和k键，放开后再按一个v键
 
 * ## 面包屑导航
 
+  ### el-breadcrumb-item
+
+  * el-breadcrum: 面包屑导航容器，separator控制面包屑导航文本中的分割线
+  * el-breadccrumb-item: 面包屑子项目，可以使用to属性切换路由，slot中可以包含 a 标签来跳转外链
+  ```js
+    <el-breadcrumb separator="-">
+        <el-breadcrumb-item to="{path:'/'}">首页</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{path: '/book/create'}">图书管理</el-breadcrumb-item>
+        <el-breadcrumb-item><a href="/">活动管理</a></el-breadcrumb-item>
+        <el-breadcrumb-item>活动列表</el-breadcrumb-item>
+        <el-breadcrumb-item>活动详情</el-breadcrumb-item>
+    </el-breadcrumb>
+  ```
+  使用 to 属性和 a 标签切换路由的区别是：to 属性切换路由是动态替代app.vue中的内容，而 a 标签切换路由会刷新页面
+
+  ### 路由与面包屑导航映射
+
+  面包屑导航最大的难度在于如何将路由与棉鞋导航进行映射，如下是vue-element-admin的实现细节：
+
+  #### 生成面包屑导航
+
+    breadcrumb.vue
+
+  ```js
+    getBreadcrumb() {
+      // only show routes with meta.title
+      let matched = this.$route.matched.filter(item => item.meta && item.meta.title)
+      const first = matched[0]
+
+      if (!this.isDashboard(first)) {
+        matched = [{ path: '/dashboard', meta: { title: 'Dashboard' }}].concat(matched)
+      }
+
+      this.levelList = matched.filter(item => item.meta && item.meta.title && item.meta.breadcrumb !== false)
+    },
+  ```
+    这个就是生成面包屑导航的核心get方法。这个方法最关键的是我们路由信息中提供的matched属性，这里这个matched属性打印之后可以看出，就是我们路由的匹配的过程。他和我们的面包屑导航非常相似，他从matched中获取title作为面包屑导航的文本显示。他会将matched中没有title的去掉，过滤完之后，他会将第一项取出来，判断它是不是dashboard，如果不是，他会我们的第一项加入一个dashboard，然后和后面的matched进行相连。
+
+    面包屑导航实现的逻辑如下：
+
+    * 获取 this.$route.matched ，并过滤其中不包含 item.meta.title 的项，生成新的面包屑导航数据组 matched
+    * 判断 matched 第一项是否为 dashboard ，如果不是，则添加dashboard 为面包屑导航的第一项
+    * 再次过滤 matched 中的 item.meta.title 为空的项和 item.meta.breadcrumb 为false的项。
+    * 这里关键的 this.$route.meta.matched属性它是一个数组，记录了路由匹配的过程，这就是面包屑导航实现的基础
+
+    #### 渲染面包屑导航
+
+    面包屑导航模板源码
+
+    ```html
+    <el-breadcrumb class="app-breadcrumb" separator="/">
+        <transition-group name="breadcrumb">
+        <el-breadcrumb-item v-for="(item,index) in levelList" :key="item.path">
+            <span v-if="item.redirect==='noRedirect'||index==levelList.length-1" class="no-redirect">{{ item.meta.title }}</span>
+            <a v-else @click.prevent="handleLink(item)">{{ item.meta.title }}</a>
+        </el-breadcrumb-item>
+        </transition-group>
+    </el-breadcrumb>
+    ```
+
+    el-breadcrumb-item内做了一个判断，如果是最后一个元素或者路由的redirect 属性指定为noRedirect则不会生成连接，否者将使用 a 标签生成可点击的连接，但是这里使用了 @click.prevent阻止了 a 标签的默认事件触发，而是采用自定义的 handleLink 方法处理路由跳转，handleLink 方法源码如下：
+
+    ```js
+        handleLink(item) {
+        const { redirect, path } = item
+        if (redirect) {
+            this.$router.push(redirect)
+            return
+        }
+        this.$router.push(this.pathCompile(path))
+        }
+    ```
+    这里这个 pathCompile 用于解决动态路由匹配问题
+
 * ## 前端开发tips
     ### 类型转换
     #### 快速转Number
